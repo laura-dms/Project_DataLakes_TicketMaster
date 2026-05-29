@@ -1,0 +1,47 @@
+services:
+  # 1. Couche RAW : LocalStack (Simulation AWS S3)
+  localstack:
+    #image: localstack/localstack:latest
+    image: localstack/localstack:3.8
+    container_name: datalake_raw_localstack
+    ports:
+      - "4566:4566"            # Port principal de l'API LocalStack
+    environment:
+      - SERVICES=s3            # On active uniquement S3 pour économiser les ressources
+      - AWS_DEFAULT_REGION=us-east-1
+    volumes:
+      - "localstack_data:/var/lib/localstack"
+
+
+  # 2. Couche STAGING : MySQL
+  mysql:
+    image: mysql:8.0
+    container_name: datalake_staging_mysql
+    ports:
+      - "3307:3306"
+    environment:
+      - MYSQL_ROOT_PASSWORD=rootpassword
+      - MYSQL_DATABASE=staging_ticketmaster
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+
+  # 3. Couche CURATED : MongoDB (NoSQL)
+  mongodb:
+    image: mongo:latest
+    container_name: datalake_curated_mongodb
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=admin
+      - MONGO_INITDB_ROOT_PASSWORD=adminpassword
+      - MONGO_INITDB_DATABASE=curated_datalake
+    volumes:
+      - mongo_data:/data/db
+
+
+volumes:
+  localstack_data:
+  mysql_data:
+  mongo_data:
+
