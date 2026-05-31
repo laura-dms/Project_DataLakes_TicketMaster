@@ -2,9 +2,7 @@ import boto3
 import pymysql
 from pymongo import MongoClient
 
-
 print("Vérification des connexions aux couches du Data Lake...")
-
 
 # 1. Test S3 LocalStack
 try:
@@ -15,7 +13,6 @@ try:
 except Exception as e:
     print(f"Couche RAW (LocalStack) Échec : {e}")
 
-
 # 2. Test MySQL Staging
 try:
     conn = pymysql.connect(host='localhost', user='root', password='rootpassword', database='staging_ticketmaster', port=3307)
@@ -24,13 +21,12 @@ try:
 except Exception as e:
     print(f"Couche STAGING (MySQL) Échec : {e}")
 
-
 # 3. Test MongoDB Curated
 try:
     client = MongoClient('mongodb://admin:adminpassword@localhost:27017/')
     db = client['curated_datalake']
     # Force une connexion
-    client.server_info()
+    client.server_info() 
     print("Couche CURATED (MongoDB) : Connectée avec succès !")
     client.close()
 except Exception as e:
