@@ -21,6 +21,7 @@ dependencies = [
     "polars>=1.41.2",
     "sqlalchemy>=2.0.0",
     "pyarrow>=14.0.0",
+    "connectorx>=0.4.5",
 ]
 
 [tool.hatch.build.targets.wheel]
