@@ -4,6 +4,7 @@ import joblib
 import pandas as pd
 from pymongo import MongoClient
 from datetime import date, datetime
+import json
 
 # Configuration des bases de données
 MYSQL_CONFIG = {
@@ -82,8 +83,17 @@ def main():
         return
 
     # Extraction des valeurs contextuelles de l'année de référence (Constantes de contexte économique)
-    market_avg = float(latest_tourism["market_avg"] or 0)
-    market_max = float(latest_tourism["market_max"] or 0)
+    market_avg_raw = float(latest_tourism["market_avg"] or 0)
+    market_max_raw = float(latest_tourism["market_max"] or 0)
+
+    # Charger les bornes sauvegardées lors du training (obligatoire pour cohérence)
+    with open("models/norm_params.json", "r") as f:
+        norm_params = json.load(f)
+    # Passer les features BRUTES au modèle — le modèle a été entraîné sur les valeurs brutes
+    # La normalisation est faite DANS la fonction de génération des targets, pas dans les features X
+    # Donc on passe market_avg et market_max RAW, exactement comme lors du fit()
+    market_avg = market_avg_raw
+    market_max = market_max_raw
 
     # 3. Préparation de la matrice d'Inférence (Features de 2026)
     features_2026_list = []
