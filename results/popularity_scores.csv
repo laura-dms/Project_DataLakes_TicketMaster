@@ -1,0 +1,33 @@
+event_type;month;average_popularity_score
+arts & theatre;2;42.2
+arts & theatre;3;48.6
+arts & theatre;6;56.5
+arts & theatre;7;56.6
+arts & theatre;8;56.6
+arts & theatre;9;49.7
+arts & theatre;10;46.9
+arts & theatre;11;49
+miscellaneous;2;38.8
+miscellaneous;3;30.3
+miscellaneous;9;41.5
+miscellaneous;10;34
+miscellaneous;11;33.8
+music;1;66.1
+music;3;69.2
+music;6;77.9
+music;7;87.6
+music;9;76.1
+music;10;68.6
+music;11;68.8
+music;12;65.9
+sports;1;58.7
+sports;3;63.2
+sports;4;63.2
+sports;5;63.2
+sports;6;71.8
+sports;7;70.5
+sports;8;71.4
+sports;9;65.9
+sports;10;59.10000000000001
+sports;11;59
+sports;12;55.9
