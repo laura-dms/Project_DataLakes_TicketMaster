@@ -7,6 +7,8 @@ import pymysql
 from pymongo import MongoClient
 import boto3
 from botocore.client import Config
+import time
+import subprocess
 
 # 1. On instancie l'application une seule fois et on désactive la doc standard
 app = FastAPI(
@@ -310,3 +312,60 @@ def get_curated_event_by_id(event_id: str):
         raise HTTPException(status_code=500, detail=f"Erreur MongoDB : {str(e)}")
     finally:
         mongo_client.close()
+
+# Variable globale temporaire pour stocker le temps de référence de /ingest
+# (Permet de calculer le % de réduction dans /ingest_fast)
+baseline_duration = None
+
+@app.post("/ingest", tags=["4. Benchmarks & Mode Avancé"], summary="Exécute l'ingestion Standard (Synchrone) et mesure le temps")
+def run_standard_ingest():
+    global baseline_duration
+    start_time = time.time()
+    
+    try:
+        # Exécute le script ingestion.py d'origine à l'aide de 'uv run'
+        result = subprocess.run(["uv", "run", "ingestion.py"], capture_output=True, text=True, check=True)
+        
+        duration = round(time.time() - start_time, 2)
+        baseline_duration = duration # On sauvegarde le temps de référence
+        
+        return {
+            "status": "success",
+            "pipeline": "Standard (Synchrone)",
+            "duration_seconds": duration,
+            "message": "Le Data Lake (Couche Raw) a été rechargé de manière séquentielle."
+        }
+    except subprocess.CalledProcessError as e:
+        raise HTTPException(status_code=500, detail=f"Erreur lors de l'exécution de l'ingestion : {e.stderr}")
+
+
+@app.post("/ingest_fast", tags=["4. Benchmarks & Mode Avancé"], summary="Exécute l'ingestion Optimisée (Multi-threadée) et évalue le gain de performance")
+def run_fast_ingest():
+    global baseline_duration
+    start_time = time.time()
+    
+    try:
+        # Exécute le nouveau script optimisé
+        result = subprocess.run(["uv", "run", "ingestion_fast.py"], capture_output=True, text=True, check=True)
+        
+        duration = round(time.time() - start_time, 2)
+        
+        # Calcul du pourcentage de réduction du temps de traitement
+        performance_gain = None
+        if baseline_duration and baseline_duration > 0:
+            # Formule : ((Temps_Séquentiel - Temps_Parallèle) / Temps_Séquentiel) * 100
+            reduction_percentage = ((baseline_duration - duration) / baseline_duration) * 100
+            performance_gain = f"{round(reduction_percentage, 1)}% de réduction du temps"
+        else:
+            performance_gain = "Évaluation impossible. Veuillez exécuter le endpoint /ingest classique au moins une fois d'abord pour avoir un point de comparaison."
+
+        return {
+            "status": "success",
+            "pipeline": "Optimisé (Multi-threadé)",
+            "duration_seconds": duration,
+            "baseline_reference_seconds": baseline_duration,
+            "performance_evaluation": performance_gain,
+            "message": "Le Data Lake (Couche Raw) a été rechargé en parallèle !"
+        }
+    except subprocess.CalledProcessError as e:
+        raise HTTPException(status_code=500, detail=f"Erreur lors de l'exécution de l'ingestion rapide : {e.stderr}")
