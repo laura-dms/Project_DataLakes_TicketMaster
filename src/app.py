@@ -1,7 +1,7 @@
 import os
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.openapi.docs import get_swagger_ui_html 
-from fastapi.responses import HTMLResponse          # 👈 Essentiel pour modifier la réponse brute
+from fastapi.responses import HTMLResponse
 from typing import List, Optional
 import pymysql
 from pymongo import MongoClient
@@ -19,7 +19,7 @@ app = FastAPI(
     redoc_url=None
 )
 
-# 2. Injection du CSS personnalisé style "Ticketmaster Dark Edition" (Optimisation globale de la lisibilité)
+# 2. Injection du CSS personnalisé style Ticketmaster Dark Edition
 CSS_TICKETMASTER = """
 <style>
     /* Fond général et police */
@@ -44,13 +44,13 @@ CSS_TICKETMASTER = """
        FIX LISIBILITÉ TEXTES INTERNES ET EXTERNES
        ========================================== */
        
-    /* 1. Descriptions principales des routes (ex: Liste les fichiers...) */
+    /* 1. Descriptions principales des routes */
     .swagger-ui .opblock .opblock-summary-description {
         color: #f8fafc !important;
         font-weight: 500 !important;
     }
     
-    /* 2. Chemins des routes (ex: /ingestion/files) */
+    /* 2. Chemins des routes */
     .swagger-ui .opblock .opblock-summary-path {
         color: #ffffff !important;
     }
@@ -61,21 +61,21 @@ CSS_TICKETMASTER = """
         font-size: 14px !important;
     }
     
-    /* 4. Textes d'indications vides (ex: "No parameters", "No links") */
+    /* 4. Textes d'indications vides */
     .swagger-ui .opblock-body .opblock-description-wrapper + div h4,
     .swagger-ui .opblock-body em,
     .swagger-ui .response-col_links {
         color: #cbd5e1 !important;
     }
     
-    /* 5. En-têtes de colonnes des tableaux (Code, Description, Parameters, etc.) */
+    /* 5. En-têtes de colonnes des tableaux */
     .swagger-ui .parameters-header .col_header,
     .swagger-ui .responses-header .col_header {
         color: #ffffff !important;
         font-weight: bold !important;
     }
     
-    /* 6. Descriptions des codes de réponses (ex: "Successful Response") */
+    /* 6. Descriptions des codes de réponses */
     .swagger-ui .response-col_description .response-col_description__inner div,
     .swagger-ui .response-col_status {
         color: #f8fafc !important;
@@ -133,7 +133,7 @@ CSS_TICKETMASTER = """
         border-radius: 4px;
     }
     
-    /* Bouton "Try it out" */
+    /* Bouton Try it out */
     .swagger-ui .btn.try-out__btn {
         background-color: #026cdf !important;
         color: white !important;
@@ -167,7 +167,7 @@ async def custom_swagger_ui_html():
     # 4. On renvoie le HTML modifié avec un code 200
     return HTMLResponse(content=custom_html_content, status_code=200)
 
-# --- CONFIGURATIONS DES ACCÈS (Repris de vos scripts) ---
+# --- CONFIGURATIONS DES ACCÈS DOCKER---
 MYSQL_CONFIG = {
     "host": "localhost",
     "port": 3307,
@@ -313,8 +313,7 @@ def get_curated_event_by_id(event_id: str):
     finally:
         mongo_client.close()
 
-# Variable globale temporaire pour stocker le temps de référence de /ingest
-# (Permet de calculer le % de réduction dans /ingest_fast)
+# Variable globale temporaire pour stocker le temps de référence de /ingest : calculer le % de réduction dans /ingest_fast
 baseline_duration = None
 
 @app.post("/ingest", tags=["4. Benchmarks & Mode Avancé"], summary="Exécute l'ingestion Standard (Synchrone) et mesure le temps")
@@ -323,7 +322,7 @@ def run_standard_ingest():
     start_time = time.time()
     
     try:
-        # Exécute le script ingestion.py d'origine à l'aide de 'uv run'
+        # Exécute le script ingestion.py d'origine à l'aide de uv run
         result = subprocess.run(["uv", "run", "ingestion.py"], capture_output=True, text=True, check=True)
         
         duration = round(time.time() - start_time, 2)
@@ -339,7 +338,7 @@ def run_standard_ingest():
         raise HTTPException(status_code=500, detail=f"Erreur lors de l'exécution de l'ingestion : {e.stderr}")
 
 
-@app.post("/ingest_fast", tags=["4. Benchmarks & Mode Avancé"], summary="Exécute l'ingestion Optimisée (Multi-threadée) et évalue le gain de performance")
+@app.post("/ingest_fast", tags=["4. Benchmarks du temps d'exécution de l'ingestion"], summary="Exécute l'ingestion Optimisée (Multi-threadée) et évalue le gain de performance")
 def run_fast_ingest():
     global baseline_duration
     start_time = time.time()
