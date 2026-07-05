@@ -11,7 +11,7 @@ from sklearn.pipeline import Pipeline
 SQLALCHEMY_URL = "mysql://root:rootpassword@localhost:3307/staging_ticketmaster"
 
 def train_rf_model():
-    print("🧠 [ML TRAINING] Connexion à la base MySQL Staging via Polars...")
+    print("[ML TRAINING] Connexion à la base MySQL Staging via Polars...")
 
     query_tourism = """
         SELECT year,
@@ -28,10 +28,10 @@ def train_rf_model():
     df_events = pl.read_database_uri(query_events, uri=SQLALCHEMY_URL)
 
     if df_tourism.is_empty() or df_events.is_empty():
-        print("❌ Erreur : Les tables sont vides.")
+        print("Erreur : Les tables sont vides.")
         return
 
-    # ✅ FIX 1 : Calculer les bornes de normalisation sur les données réelles
+    # Calculer les bornes de normalisation sur les données réelles
     # On utilise le percentile 95 comme plafond pour ne pas se faire écraser par les outliers
     market_avg_values = df_tourism["market_avg"].to_list()
     market_avg_values.sort()
@@ -45,9 +45,9 @@ def train_rf_model():
     MARKET_MAX_NORM_MAX = market_max_values[p95_idx_max]
     MARKET_MAX_NORM_MAX = max(MARKET_MAX_NORM_MAX, 1.0)
 
-    print(f"📐 Normalisation : market_avg_p95={MARKET_AVG_NORM_MAX:.0f} | market_max_p95={MARKET_MAX_NORM_MAX:.0f}")
+    print(f"Normalisation : market_avg_p95={MARKET_AVG_NORM_MAX:.0f} | market_max_p95={MARKET_MAX_NORM_MAX:.0f}")
 
-    print("📊 [ML TRAINING] Génération du jeu de données d'apprentissage...")
+    print("[ML TRAINING] Génération du jeu de données d'apprentissage...")
     records = []
 
     for year_row in df_tourism.iter_rows(named=True):
@@ -87,16 +87,16 @@ def train_rf_model():
                     base += 3  # petit bonus été mais plafonné, max = 15
 
 
-            # ✅ FIX 2 : market_avg normalisé entre 0 et 1, contribution max = 15 pts
+            # market_avg normalisé entre 0 et 1, contribution max = 15 pts
             market_avg_norm = min(year_row["market_avg"] / MARKET_AVG_NORM_MAX, 1.0)
             market_impact = market_avg_norm * 15.0
 
-            # ✅ FIX 3 : Bruit élargi pour créer une vraie distribution
+            # Bruit élargi pour créer une vraie distribution
             noise = random.uniform(-18.0, 18.0)
 
             popularity_target = base + market_impact + noise
 
-            # ✅ FIX 4 : Plafond à 95 (pas 100) pour éviter le clustering au max
+            # Plafond à 95 (pas 100) pour éviter le clustering au max
             popularity_target = min(95.0, max(5.0, popularity_target))
 
             records.append({
@@ -132,18 +132,18 @@ def train_rf_model():
         ("regressor", RandomForestRegressor(n_estimators=100, max_depth=10, random_state=42))
     ])
 
-    print("🌲 [ML TRAINING] Entraînement du modèle Random Forest...")
-    # ✅ Passage des sample_weight via le nom de l'étape dans le Pipeline
+    print("[ML TRAINING] Entraînement du modèle Random Forest...")
+    # Passage des sample_weight via le nom de l'étape dans le Pipeline
     pipeline.fit(X, y, regressor__sample_weight=sample_weights)
 
     r2_score = pipeline.score(X, y)
-    print(f"✅ Modèle entraîné. R² = {r2_score:.4f}")
+    print(f"Modèle entraîné. R² = {r2_score:.4f}")
 
     os.makedirs("models", exist_ok=True)
     joblib.dump(pipeline, "models/rf_popularity.joblib")
     X.to_csv("models/drift_reference.csv", index=False)
 
-    # ✅ FIX 5 : Sauvegarder les bornes de normalisation pour curated.py
+    # Sauvegarder les bornes de normalisation pour curated.py
     norm_params = {
         "market_avg_norm_max": MARKET_AVG_NORM_MAX,
         "market_max_norm_max": MARKET_MAX_NORM_MAX
@@ -151,7 +151,7 @@ def train_rf_model():
     import json
     with open("models/norm_params.json", "w") as f:
         json.dump(norm_params, f)
-    print(f"💾 Paramètres de normalisation sauvegardés dans 'models/norm_params.json'.")
+    print(f"Paramètres de normalisation sauvegardés dans 'models/norm_params.json'.")
 
     # Validation rapide post-training
     import pandas as pd
@@ -164,7 +164,7 @@ def train_rf_model():
     preds = pipeline.predict(test_cases)
     for i, row in test_cases.iterrows():
         print(f"   {row['event_type']:20s} | mois {row['event_month']:>2s} → score prédit : {preds[i]:.1f}")
-
+        
 
 if __name__ == "__main__":
     train_rf_model()
