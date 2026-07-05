@@ -164,7 +164,7 @@ def train_rf_model():
     preds = pipeline.predict(test_cases)
     for i, row in test_cases.iterrows():
         print(f"   {row['event_type']:20s} | mois {row['event_month']:>2s} → score prédit : {preds[i]:.1f}")
-
+        
 
 if __name__ == "__main__":
     train_rf_model()
