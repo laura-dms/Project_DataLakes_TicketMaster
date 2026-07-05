@@ -127,10 +127,19 @@ def parse_and_load_ticketmaster(s3_client):
         # 2. Extraction de l'Événement
         event_id = ev.get('id')
         if event_id:
+            classifications = ev.get('classifications', [])
+            true_type = "none" # Valeur par défaut si non spécifié
+            
+            if classifications and isinstance(classifications, list):
+                segment = classifications[0].get('segment', {})
+                if segment and segment.get('name'):
+                    # On extrait le nom et on le passe en minuscules (ex: "sports", "music")
+                    true_type = str(segment.get('name')).lower()
+
             events_data.append({
                 "id": str(event_id),
                 "name": ev.get('name'),
-                "type": ev.get('type'),
+                "type": true_type,
                 "url": ev.get('url'),
                 "local_date": ev.get('dates', {}).get('start', {}).get('localDate'),
                 "venue_id": str(venue_id) if venue_id else None
