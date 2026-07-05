@@ -28,14 +28,14 @@ def convert_dates(obj):
     return obj
 
 def main():
-    print("🚀 Démarrage de la couche CURATED (Machine Learning & MongoDB)...")
+    print("Démarrage de la couche CURATED (Machine Learning & MongoDB)...")
     
     # 1. Vérification et chargement du modèle Random Forest
     model_path = "models/rf_popularity.joblib"
     ref_path = "models/drift_reference.csv"
     
     if not os.path.exists(model_path) or not os.path.exists(ref_path):
-        print("⚠️ Modèle introuvable. Lancement automatique de l'entraînement d'abord...")
+        print("Modèle introuvable. Lancement automatique de l'entraînement d'abord...")
         from train_model import train_rf_model
         train_rf_model()
         
@@ -79,7 +79,7 @@ def main():
     mysql_conn.close()
 
     if not events:
-        print("❌ Aucun événement trouvé dans le Staging MySQL. Fin du script.")
+        print("Aucun événement trouvé dans le Staging MySQL. Fin du script.")
         return
 
     # Extraction des valeurs contextuelles de l'année de référence (Constantes de contexte économique)
@@ -118,10 +118,10 @@ def main():
     
     drift_status = "DRIFT_DETECTED" if len(new_categories) > 0 else "PASSED"
     psi_score_simulated = 0.22 if drift_status == "DRIFT_DETECTED" else 0.03
-    print(f"📊 Vérification du Data Drift : Statut = {drift_status} (Score PSI simulé : {psi_score_simulated})")
+    print(f"Vérification du Data Drift : Statut = {drift_status} (Score PSI simulé : {psi_score_simulated})")
 
     # 4. Inférence (Calcul des prédictions dynamiques par le Random Forest)
-    print("🌲 Calcul des scores de popularité personnalisés via le Random Forest...")
+    print("Calcul des scores de popularité personnalisés via le Random Forest...")
     predicted_scores = model.predict(df_features_2026)
 
     # 5. Dénormalisation et assemblage des documents JSON
@@ -148,7 +148,7 @@ def main():
                 "data_drift_status": drift_status,
                 "psi_score": psi_score_simulated,
                 "predicted_popularity_score": round(float(predicted_scores[idx]), 1),
-                "interpretation": "Score prédictif calculé par IA basé sur les caractéristiques de l'événement projetées sur le profil de maturité du marché."
+                "interpretation": "Score prédictif calculé via les prédictions du Random Forest basé sur les caractéristiques de l'événement projetées sur le profil de maturité du marché."
             }
         })
 
@@ -162,8 +162,8 @@ def main():
         collection.insert_many(documents)
 
     mongo_client.close()
-    print(f"✅ {len(documents)} événements enrichis par le Random Forest insérés dans MongoDB.")
-    print("🏁 Couche CURATED terminée avec succès.")
+    print(f"{len(documents)} événements enrichis par le Random Forest insérés dans MongoDB.")
+    print("Couche CURATED terminée avec succès.")
 
 if __name__ == "__main__":
     main()

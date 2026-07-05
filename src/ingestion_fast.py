@@ -3,7 +3,7 @@ import json
 import requests
 import boto3
 from botocore.client import Config
-from concurrent.futures import ThreadPoolExecutor # 👈 Pour le multi-threading
+from concurrent.futures import ThreadPoolExecutor
 
 TICKETMASTER_API_KEY = os.getenv("TICKETMASTER_API_KEY", "Gp9H78beEUEtDsYFVkVlOAaMnbJnPlSo")
 LOCALSTACK_ENDPOINT = "http://localhost:4566"
