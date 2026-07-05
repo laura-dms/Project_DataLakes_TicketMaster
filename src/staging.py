@@ -26,7 +26,7 @@ def get_s3_client():
 
 def init_mysql_tables():
     """Crée les tables SQL en s'assurant que les IDs respectent strictement la casse (Case Sensitive)."""
-    print("🗄️ 1. Initialisation du schéma de base de données MySQL...")
+    print("1. Initialisation du schéma de base de données MySQL...")
     engine = create_engine(SQLALCHEMY_URL)
     with engine.begin() as conn:
         conn.execute(text("SET GLOBAL max_allowed_packet = 1073741824;"))
@@ -86,19 +86,19 @@ def init_mysql_tables():
         """))
         
         conn.execute(text("SET FOREIGN_KEY_CHECKS = 1;"))
-    print("✅ Schéma MySQL prêt (avec support Case-Sensitive pour Ticketmaster).")
+    print("Schéma MySQL prêt (avec support Case-Sensitive pour Ticketmaster).")
 
 
 def parse_and_load_ticketmaster(s3_client):
     """Télécharge le fichier JSON unique d'événements, extrait tout le réel (y compris les prix) et écrit dans MySQL."""
-    print("🔄 2. Extraction et transformation des données Ticketmaster (Fichier unique) avec Polars...")
+    print("2. Extraction et transformation des données Ticketmaster (Fichier unique) avec Polars...")
     
     try:
         obj_events = s3_client.get_object(Bucket=BUCKET_NAME, Key="raw/ticketmaster/events_raw.json")
         raw_data = json.loads(obj_events['Body'].read().decode('utf-8'))
         events_list = raw_data.get('_embedded', {}).get('events', [])
     except Exception as e:
-        print(f"❌ Impossible de lire events_raw.json de S3 : {e}")
+        print(f"Impossible de lire events_raw.json de S3 : {e}")
         return
 
     venues_data = []
@@ -199,22 +199,22 @@ def parse_and_load_ticketmaster(s3_client):
             connection=SQLALCHEMY_URL, 
             if_table_exists="append", 
             engine="sqlalchemy",
-            engine_options={"chunksize": 200}  # 👈 Découpe l'envoi
+            engine_options={"chunksize": 200}  # Découpe l'envoi
         )
         print(f"   -> {df_prices.height} grilles de prix réelles insérées dans 'prices'.")
     else:
-        print("   -> ⚠️ Aucune grille de prix réelle trouvée dans le fichier, la table 'prices' restera vide.")
+        print("   ->Aucune grille de prix réelle trouvée dans le fichier, la table 'prices' restera vide.")
 
 
 def parse_and_load_tourism(s3_client):
     """Télécharge le fichier TSF, isole la section @data et extrait l'année de start_timestamp."""
-    print("🔄 3. Extraction et parsing du fichier Tourisme .tsf adapté aux spécificités...")
+    print("3. Extraction et parsing du fichier Tourisme .tsf adapté aux spécificités...")
     
     try:
         obj_tsf = s3_client.get_object(Bucket=BUCKET_NAME, Key="raw/monash_tourism/tourism_yearly_dataset.tsf")
         tsf_lines = obj_tsf['Body'].read().decode('utf-8').splitlines()
     except Exception as e:
-        print(f"❌ Impossible de lire le fichier TSF sur S3 : {e}")
+        print(f"Impossible de lire le fichier TSF sur S3 : {e}")
         return
 
     records = []
@@ -263,11 +263,11 @@ def parse_and_load_tourism(s3_client):
 def main():
     s3_client = get_s3_client()
     
-    print("🚀 Démarrage du pipeline de STAGING (Moteur : POLARS)...")
+    print("Démarrage du pipeline de STAGING (Moteur : POLARS)...")
     init_mysql_tables()
     parse_and_load_ticketmaster(s3_client)
     parse_and_load_tourism(s3_client)
-    print("🏁 Fin de l'étape Staging MySQL.")
+    print("Fin de l'étape Staging MySQL.")
 
 
 if __name__ == "__main__":
