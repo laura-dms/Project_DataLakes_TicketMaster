@@ -1,4 +1,3 @@
-````markdown
 # Data Lake Pipeline – Ticketmaster
 
 Ce projet met en œuvre un **pipeline Data Lake** basé sur l'architecture **Raw → Staging → Curated** à partir des données de l'API **Ticketmaster** et de données externes de fréquentation touristique.
@@ -232,4 +231,3 @@ curated_mongodb
 - Le modèle de Machine Learning enrichit les données.
 - Les données finales sont stockées dans **MongoDB**.
 - Les résultats peuvent être consultés via l'API **FastAPI**.
-````
