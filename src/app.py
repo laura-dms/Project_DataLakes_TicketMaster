@@ -203,6 +203,64 @@ def get_s3_client():
         config=Config(s3={'addressing_style': 'path'})
     )
 
+# --- 0. ENDPOINT DE SANTÉ (HEALTHCHECK) ---
+
+@app.get("/health", tags=["0. Healthcheck"], summary="Vérifie l'état de santé du Data Lake et des bases de données")
+def health_check():
+    """
+    Vérifie en temps réel la connectivité avec LocalStack (S3), MySQL et MongoDB.
+    Retourne un statut global 'healthy' ou 'unhealthy' avec le détail par service.
+    """
+    health_status = {
+        "status": "healthy",
+        "timestamp": time.time(),
+        "services": {
+            "s3_localstack": {"status": "unknown"},
+            "mysql_staging": {"status": "unknown"},
+            "mongodb_curated": {"status": "unknown"}
+        }
+    }
+    
+    # 1. Vérification S3 (LocalStack)
+    try:
+        s3 = get_s3_client()
+        # Une opération légère : lister les buckets existants pour vérifier la connectivité
+        s3.list_buckets()
+        health_status["services"]["s3_localstack"] = {"status": "up"}
+    except Exception as e:
+        health_status["services"]["s3_localstack"] = {"status": "down", "error": str(e)}
+        health_status["status"] = "unhealthy"
+
+    # 2. Vérification MySQL (Staging)
+    try:
+        conn = get_mysql_conn()
+        with conn.cursor() as cursor:
+            # Un ping SQL ultra léger pour vérifier la connectivité
+            cursor.execute("SELECT 1;")
+        conn.close()
+        health_status["services"]["mysql_staging"] = {"status": "up"}
+    except Exception as e:
+        health_status["services"]["mysql_staging"] = {"status": "down", "error": str(e)}
+        health_status["status"] = "unhealthy"
+
+    # 3. Vérification MongoDB (Curated)
+    try:
+        mongo_client, _ = get_mongo_collection()
+        # Vérification avec ping pour s'assurer que le serveur MongoDB répond
+        mongo_client.admin.command('ping')
+        mongo_client.close()
+        health_status["services"]["mongodb_curated"] = {"status": "up"}
+    except Exception as e:
+        health_status["services"]["mongodb_curated"] = {"status": "down", "error": str(e)}
+        health_status["status"] = "unhealthy"
+
+    # Si l'un des services est down, on lève une HTTPException 503 (Service Unavailable)
+    # tout en renvoyant le détail pour aider au debug.
+    if health_status["status"] == "unhealthy":
+        raise HTTPException(status_code=503, detail=health_status)
+
+    return health_status
+
 # --- 1. ENDPOINTS COUCHE : INGESTION (RAW - S3) ---
 
 @app.get("/ingestion/files", tags=["1. Ingestion (Raw)"], summary="Liste les fichiers bruts stockés dans S3")
@@ -271,12 +329,12 @@ def get_staging_prices(event_id: str):
 
 @app.get("/curated/events", tags=["3. Curated (MongoDB)"], summary="Liste les événements enrichis par le Random Forest")
 def get_curated_events(
-    drift_status: Optional[str] = Query(None, description="Filtrer par statut de drift : 'PASSED' ou 'DRIFT_DETECTED'"),
+    drift_status: Optional[str] = Query(None, description="Filtrer par statut de drift : PASSED ou DRIFT_DETECTED"),
     min_popularity: Optional[float] = Query(None, description="Score de popularité prédit minimum")
 ):
     """
     Récupère les documents JSON finaux depuis MongoDB.
-    Permet de filtrer sur le statut du Data Drift et le score généré par l'IA.
+    Permet de filtrer sur le statut du Data Drift et le score généré par le Random Forest (ML).
     """
     mongo_client, collection = get_mongo_collection()
     try:
@@ -316,7 +374,7 @@ def get_curated_event_by_id(event_id: str):
 # Variable globale temporaire pour stocker le temps de référence de /ingest : calculer le % de réduction dans /ingest_fast
 baseline_duration = None
 
-@app.post("/ingest", tags=["4. Benchmarks & Mode Avancé"], summary="Exécute l'ingestion Standard (Synchrone) et mesure le temps")
+@app.post("/ingest", tags=["4. Benchmark du temps d'exécution de l'ingestion"], summary="Exécute l'ingestion Standard (Synchrone) et mesure le temps")
 def run_standard_ingest():
     global baseline_duration
     start_time = time.time()
@@ -338,7 +396,7 @@ def run_standard_ingest():
         raise HTTPException(status_code=500, detail=f"Erreur lors de l'exécution de l'ingestion : {e.stderr}")
 
 
-@app.post("/ingest_fast", tags=["4. Benchmarks du temps d'exécution de l'ingestion"], summary="Exécute l'ingestion Optimisée (Multi-threadée) et évalue le gain de performance")
+@app.post("/ingest_fast", tags=["4. Benchmark du temps d'exécution de l'ingestion"], summary="Exécute l'ingestion Optimisée (Multi-threadée) et évalue le gain de performance")
 def run_fast_ingest():
     global baseline_duration
     start_time = time.time()
@@ -368,3 +426,121 @@ def run_fast_ingest():
         }
     except subprocess.CalledProcessError as e:
         raise HTTPException(status_code=500, detail=f"Erreur lors de l'exécution de l'ingestion rapide : {e.stderr}")
+
+# --- ENDPOINT DES STATISTIQUES (VOLUMÉTRIE & METRICS) ---
+
+@app.get("/stats", tags=["5. Statistiques Globales"], summary="Génère un état des lieux de la volumétrie du Data Lake")
+def get_lake_statistics():
+    """
+    Scanne les 3 couches du Data Lake (Raw, Staging, Curated) pour compiler
+    des indicateurs de volumétrie et de répartition des données.
+    """
+    stats = {
+        "timestamp": time.time(),
+        "couche_1_raw_s3": {},
+        "couche_2_staging_mysql": {},
+        "couche_3_curated_mongodb": {}
+    }
+
+    # ==========================================
+    # 1. METRIQUES COUCHE 1 : RAW (S3 / LocalStack)
+    # ==========================================
+    try:
+        s3 = get_s3_client()
+        response = s3.list_objects_v2(Bucket=BUCKET_NAME)
+        
+        total_files = 0
+        total_size_bytes = 0
+        file_keys = []
+        
+        if 'Contents' in response:
+            total_files = len(response['Contents'])
+            file_keys = [obj['Key'] for obj in response['Contents']]
+            total_size_bytes = sum(obj['Size'] for obj in response['Contents'])
+
+        stats["couche_1_raw_s3"] = {
+            "bucket_name": BUCKET_NAME,
+            "total_files": total_files,
+            "total_size_mb": round(total_size_bytes / (1024 * 1024), 3),
+            "files_present": file_keys
+        }
+    except Exception as e:
+        stats["couche_1_raw_s3"] = {"error": f"Impossible d'accéder à S3 : {str(e)}"}
+
+    # ==========================================
+    # 2. METRIQUES COUCHE 2 : STAGING (MySQL)
+    # ==========================================
+    try:
+        conn = get_mysql_conn()
+        with conn.cursor() as cursor:
+            # Récupération du nombre total de lignes par table
+            tables = ["events", "venues", "prices", "tourism_history"]
+            table_counts = {}
+            
+            for table in tables:
+                cursor.execute(f"SELECT COUNT(*) AS cnt FROM {table};")
+                res = cursor.fetchone()
+                table_counts[table] = res["cnt"] if res else 0
+
+            # Répartion des événements par type (catégorie)
+            cursor.execute("""
+                SELECT type, COUNT(*) as count 
+                FROM events 
+                GROUP BY type 
+                ORDER BY count DESC;
+            """)
+            type_distribution = {row["type"]: row["count"] for row in cursor.fetchall()}
+
+        conn.close()
+        
+        stats["couche_2_staging_mysql"] = {
+            "tables_volumetry": table_counts,
+            "events_by_type": type_distribution,
+            "total_stored_records": sum(table_counts.values())
+        }
+    except Exception as e:
+        stats["couche_2_staging_mysql"] = {"error": f"Impossible d'accéder à MySQL : {str(e)}"}
+
+    # ==========================================
+    # 3. METRIQUES COUCHE 3 : CURATED (MongoDB)
+    # ==========================================
+    try:
+        mongo_client, collection = get_mongo_collection()
+        
+        # Nombre total de documents enrichis
+        total_curated_events = collection.count_documents({})
+        
+        # Pipeline d'agrégation pour obtenir :
+        # - La répartition du statut de Data Drift
+        # - Le score moyen de popularité prédit
+        pipeline = [
+            {
+                "$group": {
+                    "_id": "$machine_learning.data_drift_status",
+                    "count": {"$sum": 1},
+                    "avg_popularity": {"$avg": "$machine_learning.predicted_popularity_score"}
+                }
+            }
+        ]
+        
+        aggregation_results = list(collection.aggregate(pipeline))
+        mongo_client.close()
+
+        drift_summary = {}
+        avg_popularity_scores = {}
+        
+        for item in aggregation_results:
+            status = item["_id"] or "UNKNOWN"
+            drift_summary[status] = item["count"]
+            avg_popularity_scores[status] = round(item["avg_popularity"], 2) if item["avg_popularity"] is not None else 0.0
+
+        stats["couche_3_curated_mongodb"] = {
+            "collection_name": collection.name,
+            "total_enriched_events": total_curated_events,
+            "data_drift_distribution": drift_summary,
+            "average_predicted_popularity_by_drift": avg_popularity_scores
+        }
+    except Exception as e:
+        stats["couche_3_curated_mongodb"] = {"error": f"Impossible d'accéder à MongoDB : {str(e)}"}
+
+    return stats
